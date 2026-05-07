@@ -1,0 +1,113 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            Int            @id @default(autoincrement())
+  email         String         @unique @db.VarChar(255)
+  passwordHash  String
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  domains       Domain[]
+  revenues      RevenueEntry[]
+  expenses      Expense[]
+  exchangeRates ExchangeRate[]
+}
+
+model Domain {
+  id         Int            @id @default(autoincrement())
+  userId     Int
+  name       String         @db.VarChar(100)
+  slug       String         @db.VarChar(100)
+  isArchived Boolean        @default(false)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  revenues   RevenueEntry[]
+  expenses   Expense[]
+
+  @@unique([userId, slug])
+  @@index([userId])
+}
+
+model RevenueEntry {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  domainId  Int
+  network   Network
+  amount    Decimal  @db.Decimal(15, 2)
+  currency  Currency
+  month     Int
+  year      Int
+  notes     String?  @db.VarChar(500)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  domain    Domain   @relation(fields: [domainId], references: [id], onDelete: Cascade)
+
+  @@index([userId, year, month])
+  @@index([domainId, year, month])
+}
+
+model Expense {
+  id          Int         @id @default(autoincrement())
+  userId      Int
+  domainId    Int?
+  type        ExpenseType
+  category    String      @db.VarChar(100)
+  description String      @db.VarChar(500)
+  amount      Decimal     @db.Decimal(15, 2)
+  currency    Currency
+  date        DateTime    @db.Date
+  isRecurring Boolean     @default(false)
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  domain      Domain?     @relation(fields: [domainId], references: [id], onDelete: SetNull)
+
+  @@index([userId, date])
+}
+
+model ExchangeRate {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  fromCurrency  Currency
+  toCurrency    Currency
+  rate          Decimal  @db.Decimal(15, 4)
+  effectiveDate DateTime @db.Date
+  createdAt     DateTime @default(now())
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, fromCurrency, toCurrency, effectiveDate])
+}
+
+model LoginAttempt {
+  id        Int      @id @default(autoincrement())
+  email     String   @db.VarChar(255)
+  ip        String   @db.VarChar(45)
+  createdAt DateTime @default(now())
+
+  @@index([email, createdAt])
+  @@index([ip, createdAt])
+}
+
+enum Network {
+  CLICKADILLA
+  CLICKADU
+  ADSTERRA
+}
+
+enum Currency {
+  USD
+  IDR
+}
+
+enum ExpenseType {
+  OPERATIONAL
+  OTHER
+}
