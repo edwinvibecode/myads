@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useState, Suspense, useMemo } from "react";
 import { Download, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -16,12 +16,18 @@ interface ReportData {
 }
 interface Domain { id: number; name: string; slug: string; }
 
+const ALL_MONTHS = "ALL";
+
 function ReportsContent() {
   const [data, setData] = useState<ReportData | null>(null);
   const [domains, setDomains] = useState<Domain[]>([]);
   const [loading, setLoading] = useState(true);
   const [domainId, setDomainId] = useState("");
   const [year, setYear] = useState(String(new Date().getFullYear()));
+  const [month, setMonth] = useState<string>(ALL_MONTHS);
+
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth() + 1; // 1-12
 
   useEffect(() => {
     fetch("/api/domains").then((r) => r.json()).then(setDomains);
@@ -37,11 +43,32 @@ function ReportsContent() {
       .catch(() => setLoading(false));
   }, [domainId, year]);
 
+  // Filter and sort: hide future months, sort Z-A (newest first)
+  const filteredData = useMemo(() => {
+    if (!data) return [];
+    
+    const selectedYear = parseInt(year, 10);
+    let months = data.monthlyData;
+    
+    // Hide future months for current year
+    if (selectedYear === currentYear) {
+      months = months.filter((m) => m.month <= currentMonth);
+    }
+    
+    // Apply month filter
+    if (month !== ALL_MONTHS) {
+      months = months.filter((m) => m.month === parseInt(month, 10));
+    }
+    
+    // Sort Z-A (descending by month - newest first)
+    return [...months].sort((a, b) => b.month - a.month);
+  }, [data, year, month, currentYear, currentMonth]);
+
   function exportCSV() {
     if (!data) return;
     const rows = [
       ["Bulan", "Tahun", "Revenue (IDR)", "Pengeluaran (IDR)", "Net Profit (IDR)"],
-      ...data.monthlyData.map((m) => [
+      ...filteredData.map((m) => [
         MONTH_NAMES[m.month - 1], m.year,
         Math.round(m.revenue), Math.round(m.expenses), Math.round(m.netProfit),
       ]),
@@ -65,7 +92,7 @@ function ReportsContent() {
     doc.setFontSize(16);
     doc.text(`Laporan Revenue ${year}`, 14, 20);
 
-    const tableData = data.monthlyData.map((m) => [
+    const tableData = filteredData.map((m) => [
       MONTH_NAMES[m.month - 1],
       formatCurrency(m.revenue, "IDR"),
       formatCurrency(m.expenses, "IDR"),
@@ -108,14 +135,28 @@ function ReportsContent() {
         <Select value={domainId} onValueChange={setDomainId}>
           <SelectTrigger className="w-44"><SelectValue placeholder="Global (Semua)" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Global (Semua)</SelectItem>
+            <SelectItem value="__ALL__">Global (Semua)</SelectItem>
             {domains.map((d) => <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={year} onValueChange={setYear}>
           <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
           <SelectContent>
-            {[2024, 2025, 2026, 2027].map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+            {Array.from({ length: currentYear - 2023 }, (_, i) => currentYear - i).map((y) => (
+              <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={month} onValueChange={setMonth}>
+          <SelectTrigger className="w-36"><SelectValue placeholder="Semua Bulan" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value={ALL_MONTHS}>Semua Bulan</SelectItem>
+            {[...MONTH_NAMES].reverse().map((name, idx) => {
+              const monthNum = 12 - idx; // 12, 11, 10, ..., 1
+              // Hide future months for current year
+              if (parseInt(year) === currentYear && monthNum > currentMonth) return null;
+              return <SelectItem key={monthNum} value={String(monthNum)}>{name}</SelectItem>;
+            })}
           </SelectContent>
         </Select>
       </div>
@@ -152,7 +193,7 @@ function ReportsContent() {
               <CardTitle className="text-sm font-medium text-white/70">Trend Revenue {year}</CardTitle>
             </CardHeader>
             <CardContent>
-              <RevenueChart data={data?.monthlyData.map((m) => ({ month: m.month, year: m.year, revenue: m.revenue })) ?? []} />
+              <RevenueChart data={[...filteredData].sort((a, b) => a.month - b.month).map((m) => ({ month: m.month, year: m.year, revenue: m.revenue }))} />
             </CardContent>
           </Card>
 
@@ -173,7 +214,7 @@ function ReportsContent() {
                     </tr>
                   </thead>
                   <tbody>
-                    {data?.monthlyData.map((m) => {
+                    {filteredData.map((m) => {
                       const margin = m.revenue > 0 ? ((m.netProfit / m.revenue) * 100).toFixed(1) : "0.0";
                       const hasData = m.revenue > 0 || m.expenses > 0;
                       return (

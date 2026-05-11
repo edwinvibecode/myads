@@ -65,7 +65,7 @@ export async function POST(req: Request) {
         domainId: parsed.data.domainId ?? null,
         type: parsed.data.type,
         category: parsed.data.category,
-        description: parsed.data.description,
+        description: parsed.data.description ?? "",
         amount: parsed.data.amount,
         currency: parsed.data.currency,
         date: new Date(parsed.data.date),

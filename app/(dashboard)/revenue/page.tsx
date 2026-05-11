@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, useRef, Suspense } from "react";
-import { Plus, Trash2, Pencil, Upload, Loader2 } from "lucide-react";
+import { Plus, Trash2, Pencil, Upload, Loader2, DollarSign, Globe, BarChart3 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,7 +21,7 @@ const NETWORKS = ["CLICKADILLA", "CLICKADU", "ADSTERRA"];
 const CURRENCIES = ["USD", "IDR"];
 
 const emptyForm = {
-  domainId: "", network: "CLICKADILLA", amount: "", currency: "USD",
+  domainId: "", network: "CLICKADILLA", amount: "", currency: "IDR",
   month: String(new Date().getMonth() + 1), year: String(new Date().getFullYear()), notes: "",
 };
 
@@ -46,9 +46,9 @@ function RevenueContent() {
   function loadRevenues(domain = filterDomain, month = filterMonth, year = filterYear) {
     setLoading(true);
     const params = new URLSearchParams();
-    if (domain) params.set("domainId", domain);
-    if (month) params.set("month", month);
-    if (year) params.set("year", year);
+    if (domain && domain !== "__ALL__") params.set("domainId", domain);
+    if (month && month !== "__ALL__") params.set("month", month);
+    if (year && year !== "__ALL__") params.set("year", year);
     fetch(`/api/revenues?${params}`).then((r) => r.json()).then((d) => {
       setRevenues(d);
       setLoading(false);
@@ -125,7 +125,7 @@ function RevenueContent() {
           domain: String(row.domain ?? "").trim(),
           network: String(row.network ?? "").trim().toUpperCase(),
           amount: parseFloat(String(row.amount ?? "0")),
-          currency: String(row.currency ?? "USD").trim().toUpperCase(),
+          currency: String(row.currency ?? "IDR").trim().toUpperCase(),
           month: parseInt(String(row.month ?? "1"), 10),
           year: parseInt(String(row.year ?? "2024"), 10),
           notes: row.notes ? String(row.notes).trim() : undefined,
@@ -154,6 +154,19 @@ function RevenueContent() {
     const amount = parseFloat(String(r.amount));
     return sum + (r.currency === "USD" ? amount * 16000 : amount);
   }, 0);
+
+  const networkTotals = NETWORKS.map((network) => ({
+    network,
+    label: NETWORK_LABELS[network as keyof typeof NETWORK_LABELS] ?? network,
+    total: revenues
+      .filter((r) => r.network === network)
+      .reduce((sum, r) => {
+        const amount = parseFloat(String(r.amount));
+        return sum + (r.currency === "USD" ? amount * 16000 : amount);
+      }, 0),
+  }));
+
+  const grandTotal = networkTotals.reduce((sum, n) => sum + n.total, 0);
 
   return (
     <div className="p-6 space-y-6">
@@ -197,7 +210,23 @@ function RevenueContent() {
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label>Amount</Label>
-                    <Input type="number" step="0.01" min="0" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required placeholder="0.00" />
+                    <Input
+                      type="text"
+                      inputMode="decimal"
+                      value={form.amount ? Number(form.amount).toLocaleString("id-ID") : ""}
+                      onChange={(e) => {
+                        const raw = e.target.value.replace(/[^\d]/g, "");
+                        setForm({ ...form, amount: raw });
+                      }}
+                      onBlur={() => {
+                        if (form.amount) {
+                          setForm({ ...form, amount: String(Number(form.amount)) });
+                        }
+                      }}
+                      required
+                      placeholder="0"
+                      className="text-right"
+                    />
                   </div>
                   <div className="space-y-1.5">
                     <Label>Mata Uang</Label>
@@ -224,7 +253,7 @@ function RevenueContent() {
                     <Select value={form.year} onValueChange={(v) => setForm({ ...form, year: v })}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {[2024, 2025, 2026, 2027].map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+                        {Array.from({length: 5}, (_, i) => new Date().getFullYear() - i).map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
@@ -251,22 +280,22 @@ function RevenueContent() {
         <Select value={filterDomain} onValueChange={setFilterDomain}>
           <SelectTrigger className="w-44"><SelectValue placeholder="Semua Domain" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Semua Domain</SelectItem>
+            <SelectItem value="__ALL__">Semua Domain</SelectItem>
             {domains.map((d) => <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={filterMonth} onValueChange={setFilterMonth}>
           <SelectTrigger className="w-36"><SelectValue placeholder="Semua Bulan" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Semua Bulan</SelectItem>
+            <SelectItem value="__ALL__">Semua Bulan</SelectItem>
             {MONTH_NAMES.map((m, i) => <SelectItem key={i+1} value={String(i+1)}>{m}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={filterYear} onValueChange={setFilterYear}>
           <SelectTrigger className="w-28"><SelectValue placeholder="Tahun" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Semua</SelectItem>
-            {[2024, 2025, 2026, 2027].map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+            <SelectItem value="__ALL__">Semua</SelectItem>
+            {Array.from({length: 5}, (_, i) => new Date().getFullYear() - i).map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
           </SelectContent>
         </Select>
         {(filterDomain || filterMonth || filterYear) && (
@@ -274,6 +303,35 @@ function RevenueContent() {
             Reset Filter
           </Button>
         )}
+      </div>
+
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {networkTotals.map((n) => (
+          <Card key={n.network}>
+            <CardContent className="p-4">
+              <div className="flex items-start justify-between">
+                <div>
+                  <p className="text-xs text-white/50">{n.label}</p>
+                  <p className="text-lg font-bold text-white mt-1">{formatCurrency(n.total, "IDR")}</p>
+                  {grandTotal > 0 && (
+                    <p className="text-xs text-white/40 mt-0.5">
+                      {((n.total / grandTotal) * 100).toFixed(1)}%
+                    </p>
+                  )}
+                </div>
+                <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${
+                  n.network === "CLICKADILLA" ? "bg-cyan-500/10 text-cyan-400" :
+                  n.network === "CLICKADU" ? "bg-blue-500/10 text-blue-400" :
+                  "bg-purple-500/10 text-purple-400"
+                }`}>
+                  {n.network === "CLICKADILLA" ? <DollarSign className="h-4 w-4" /> :
+                   n.network === "CLICKADU" ? <Globe className="h-4 w-4" /> :
+                   <BarChart3 className="h-4 w-4" />}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
       </div>
 
       <Card>
@@ -285,7 +343,12 @@ function RevenueContent() {
           {loading ? (
             <div className="flex items-center justify-center h-32"><Loader2 className="h-6 w-6 animate-spin text-cyan-400" /></div>
           ) : revenues.length === 0 ? (
-            <div className="text-center text-white/30 py-12">Belum ada data revenue</div>
+            <div className="text-center py-12">
+              <p className="text-white/50">Tidak ada data revenue</p>
+              {(filterDomain || filterMonth || filterYear) && (
+                <p className="text-white/30 text-sm mt-1">Coba ubah filter atau klik Reset Filter</p>
+              )}
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -334,7 +397,7 @@ function RevenueContent() {
       </Card>
 
       <div className="text-xs text-white/30 bg-white/5 rounded-lg p-3 border border-white/10">
-        <strong className="text-white/50">Format CSV:</strong> Kolom: domain, network, amount, currency, month, year, notes (opsional). Network: CLICKADILLA / CLICKADU / ADSTERRA. Currency: USD / IDR.
+        <strong className="text-white/50">Format CSV:</strong> Kolom: domain, network, amount, currency, month, year, notes (opsional). Network: CLICKADILLA / CLICKADU / ADSTERRA. Currency: IDR / USD.
       </div>
     </div>
   );

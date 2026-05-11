@@ -3,30 +3,34 @@ generator client {
 }
 
 datasource db {
-  provider = "mysql"
+  provider = "sqlite"
   url      = env("DATABASE_URL")
 }
 
 model User {
   id            Int            @id @default(autoincrement())
-  email         String         @unique @db.VarChar(255)
+  email         String         @unique 
   passwordHash  String
+  twoFactorSecret String?      // Base32 encoded TOTP secret
+  twoFactorEnabled Boolean    @default(false)
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @updatedAt
   domains       Domain[]
   revenues      RevenueEntry[]
   expenses      Expense[]
   exchangeRates ExchangeRate[]
+  adProviders   AdProvider[]
 }
 
 model Domain {
   id         Int            @id @default(autoincrement())
   userId     Int
-  name       String         @db.VarChar(100)
-  slug       String         @db.VarChar(100)
+  name       String         
+  slug       String         
   isArchived Boolean        @default(false)
   createdAt  DateTime       @default(now())
   updatedAt  DateTime       @updatedAt
+  adProviders AdProvider[]
   user       User           @relation(fields: [userId], references: [id], onDelete: Cascade)
   revenues   RevenueEntry[]
   expenses   Expense[]
@@ -39,12 +43,12 @@ model RevenueEntry {
   id        Int      @id @default(autoincrement())
   userId    Int
   domainId  Int
-  network   Network
-  amount    Decimal  @db.Decimal(15, 2)
-  currency  Currency
+  network   String   @default("CLICKADILLA")
+  amount    Decimal  
+  currency  String   @default("USD")
   month     Int
   year      Int
-  notes     String?  @db.VarChar(500)
+  notes     String?  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
@@ -58,12 +62,12 @@ model Expense {
   id          Int         @id @default(autoincrement())
   userId      Int
   domainId    Int?
-  type        ExpenseType
-  category    String      @db.VarChar(100)
-  description String      @db.VarChar(500)
-  amount      Decimal     @db.Decimal(15, 2)
-  currency    Currency
-  date        DateTime    @db.Date
+  type        String   @default("OPERATIONAL")
+  category    String   
+  description String?   
+  amount      Decimal  
+  currency    String   @default("USD")
+  date        DateTime    
   isRecurring Boolean     @default(false)
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
@@ -76,10 +80,10 @@ model Expense {
 model ExchangeRate {
   id            Int      @id @default(autoincrement())
   userId        Int
-  fromCurrency  Currency
-  toCurrency    Currency
-  rate          Decimal  @db.Decimal(15, 4)
-  effectiveDate DateTime @db.Date
+  fromCurrency  String   @default("USD")
+  toCurrency    String   @default("IDR")
+  rate          Decimal  
+  effectiveDate DateTime 
   createdAt     DateTime @default(now())
   user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -88,26 +92,40 @@ model ExchangeRate {
 
 model LoginAttempt {
   id        Int      @id @default(autoincrement())
-  email     String   @db.VarChar(255)
-  ip        String   @db.VarChar(45)
+  email     String   
+  ip        String   
   createdAt DateTime @default(now())
 
   @@index([email, createdAt])
   @@index([ip, createdAt])
 }
 
-enum Network {
-  CLICKADILLA
-  CLICKADU
-  ADSTERRA
+model AdProvider {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  domainId  Int
+  name      String    // "Adsterra", "Clickadilla", "Clickadu"
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  domain    Domain    @relation(fields: [domainId], references: [id], onDelete: Cascade)
+  codes     AdCode[]
+
+  @@index([userId, domainId])
+  @@unique([userId, domainId, name])
 }
 
-enum Currency {
-  USD
-  IDR
+model AdCode {
+  id          Int        @id @default(autoincrement())
+  providerId  Int
+  name        String     // "Banner 300x250", "Popunder"
+  format      String     // "banner", "popunder", "inpage", "native"
+  htmlCode    String     @db.Text
+  isActive    Boolean    @default(true)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  provider    AdProvider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+
+  @@index([providerId])
 }
 
-enum ExpenseType {
-  OPERATIONAL
-  OTHER
-}

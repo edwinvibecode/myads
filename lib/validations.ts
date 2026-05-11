@@ -29,7 +29,7 @@ export const expenseSchema = z.object({
   domainId: z.coerce.number().int().positive().optional().nullable(),
   type: z.enum(["OPERATIONAL", "OTHER"]),
   category: z.string().min(1).max(100).trim(),
-  description: z.string().min(1).max(500).trim(),
+  description: z.string().max(500).trim().optional(),
   amount: z.coerce.number().positive().max(999999999),
   currency: z.enum(["USD", "IDR"]),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Format tanggal harus YYYY-MM-DD"),

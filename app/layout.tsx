@@ -12,6 +12,13 @@ const geistSans = localFont({
 export const metadata: Metadata = {
   title: "MyAds Revenue Tracker",
   description: "Dashboard tracking pendapatan iklan per domain",
+  robots: {
+    index: false,
+    follow: false,
+    noarchive: true,
+    nosnippet: true,
+    noimageindex: true,
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

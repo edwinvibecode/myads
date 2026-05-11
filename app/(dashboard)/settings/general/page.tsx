@@ -15,12 +15,16 @@ export default function GeneralSettingsPage() {
   const [form, setForm] = useState({ rate: "", effectiveDate: new Date().toISOString().split("T")[0] });
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [latestRate, setLatestRate] = useState<ExchangeRate | null>(null);
   const [error, setError] = useState("");
 
   useEffect(() => {
     fetch("/api/settings/exchange-rate")
       .then((r) => r.json())
-      .then(setRates);
+      .then((data) => {
+        setRates(data);
+        setLatestRate(data[0] || null);
+      });
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -50,8 +54,6 @@ export default function GeneralSettingsPage() {
       setError(data.error ?? "Gagal menyimpan");
     }
   }
-
-  const latestRate = rates[0];
 
   return (
     <div className="p-6 space-y-6">
@@ -136,6 +138,7 @@ export default function GeneralSettingsPage() {
           </CardContent>
         </Card>
       )}
+
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState, Suspense } from "react";
-import { Plus, Trash2, Pencil, Loader2, Globe } from "lucide-react";
+import { Plus, Trash2, Pencil, Loader2, Globe, Server, Zap, ShoppingCart, Package, Settings } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,7 +19,7 @@ interface Expense {
 
 const emptyForm = {
   domainId: "", type: "OPERATIONAL", category: "", description: "",
-  amount: "", currency: "USD", date: new Date().toISOString().split("T")[0],
+  amount: "", currency: "IDR", date: new Date().toISOString().split("T")[0],
   isRecurring: false,
 };
 
@@ -35,16 +35,41 @@ function ExpensesContent() {
   const [filterType, setFilterType] = useState("");
   const [filterMonth, setFilterMonth] = useState("");
   const [filterYear, setFilterYear] = useState(String(new Date().getFullYear()));
+  const [categories, setCategories] = useState<string[]>([]);
+  const [catOpen, setCatOpen] = useState(false);
+  const [newCategory, setNewCategory] = useState("");
 
   useEffect(() => {
     fetch("/api/domains").then((r) => r.json()).then(setDomains);
+    loadCategories();
   }, []);
+
+  function loadCategories() {
+    fetch("/api/categories").then((r) => r.json()).then(setCategories);
+  }
+
+  function handleAddCategory(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newCategory.trim()) return;
+    if (!categories.includes(newCategory.trim())) {
+      setCategories([...categories, newCategory.trim()]);
+    }
+    setNewCategory("");
+  }
+
+  function handleDeleteCategory(cat: string) {
+    if (!confirm(`Hapus kategori "${cat}"?`)) return;
+    setCategories(categories.filter((c) => c !== cat));
+  }
 
   function loadExpenses(type = filterType, month = filterMonth, year = filterYear) {
     setLoading(true);
     const params = new URLSearchParams();
-    if (type) params.set("type", type);
-    if (month && year) { params.set("month", month); params.set("year", year); }
+    if (type && type !== "__ALL__") params.set("type", type);
+    if (month && month !== "__ALL__" && year && year !== "__ALL__") {
+      params.set("month", month);
+      params.set("year", year);
+    }
     fetch(`/api/expenses?${params}`).then((r) => r.json()).then((d) => {
       setExpenses(d);
       setLoading(false);
@@ -116,6 +141,36 @@ function ExpensesContent() {
     return sum + (e.currency === "USD" ? amount * 16000 : amount);
   }, 0);
 
+  const categoryTotals = expenses.reduce((acc, e) => {
+    const cat = e.category.trim() || "Uncategorized";
+    const amount = parseFloat(String(e.amount));
+    const idr = e.currency === "USD" ? amount * 16000 : amount;
+    acc[cat] = (acc[cat] || 0) + idr;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const categoryList = Object.entries(categoryTotals)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5);
+
+  const getCategoryIcon = (cat: string) => {
+    const c = cat.toLowerCase();
+    if (c.includes("server") || c.includes("hosting")) return <Server className="h-4 w-4" />;
+    if (c.includes("domain")) return <Globe className="h-4 w-4" />;
+    if (c.includes("api") || c.includes("tool")) return <Zap className="h-4 w-4" />;
+    if (c.includes("market") || c.includes("ads")) return <ShoppingCart className="h-4 w-4" />;
+    return <Package className="h-4 w-4" />;
+  };
+
+  const getCategoryColor = (cat: string) => {
+    const c = cat.toLowerCase();
+    if (c.includes("server") || c.includes("hosting")) return "bg-red-500/10 text-red-400";
+    if (c.includes("domain")) return "bg-blue-500/10 text-blue-400";
+    if (c.includes("api") || c.includes("tool")) return "bg-amber-500/10 text-amber-400";
+    if (c.includes("market") || c.includes("ads")) return "bg-purple-500/10 text-purple-400";
+    return "bg-cyan-500/10 text-cyan-400";
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center justify-between">
@@ -148,24 +203,50 @@ function ExpensesContent() {
                   <Select value={form.domainId} onValueChange={(v) => setForm({ ...form, domainId: v })}>
                     <SelectTrigger><SelectValue placeholder="Global" /></SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">Global</SelectItem>
+                      <SelectItem value="__GLOBAL__">Global</SelectItem>
                       {domains.map((d) => <SelectItem key={d.id} value={String(d.id)}>{d.name}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>Kategori</Label>
-                <Input value={form.category} onChange={(e) => setForm({ ...form, category: e.target.value })} required maxLength={100} placeholder="mis. Hosting, Domain, API" />
+                <div className="flex items-center justify-between">
+                  <Label>Kategori</Label>
+                  <Button type="button" variant="ghost" size="sm" className="h-auto py-0 px-1 text-xs text-cyan-400" onClick={() => setCatOpen(true)}>
+                    <Settings className="h-3 w-3 mr-1" /> Kelola
+                  </Button>
+                </div>
+                <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
+                  <SelectTrigger><SelectValue placeholder="Pilih kategori" /></SelectTrigger>
+                  <SelectContent>
+                    {categories.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
               <div className="space-y-1.5">
-                <Label>Deskripsi</Label>
-                <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} required maxLength={500} placeholder="Detail pengeluaran..." />
+                <Label>Deskripsi (opsional)</Label>
+                <Input value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} maxLength={500} placeholder="Detail pengeluaran..." />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label>Amount</Label>
-                  <Input type="number" step="0.01" min="0" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required placeholder="0.00" />
+                  <Input
+                    type="text"
+                    inputMode="decimal"
+                    value={form.amount ? Number(form.amount).toLocaleString("id-ID") : ""}
+                    onChange={(e) => {
+                      const raw = e.target.value.replace(/[^\d]/g, "");
+                      setForm({ ...form, amount: raw });
+                    }}
+                    onBlur={() => {
+                      if (form.amount) {
+                        setForm({ ...form, amount: String(Number(form.amount)) });
+                      }
+                    }}
+                    required
+                    placeholder="0"
+                    className="text-right"
+                  />
                 </div>
                 <div className="space-y-1.5">
                   <Label>Mata Uang</Label>
@@ -203,7 +284,7 @@ function ExpensesContent() {
         <Select value={filterType} onValueChange={setFilterType}>
           <SelectTrigger className="w-40"><SelectValue placeholder="Semua Tipe" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Semua Tipe</SelectItem>
+            <SelectItem value="__ALL__">Semua Tipe</SelectItem>
             <SelectItem value="OPERATIONAL">Operasional</SelectItem>
             <SelectItem value="OTHER">Lain-lain</SelectItem>
           </SelectContent>
@@ -211,17 +292,42 @@ function ExpensesContent() {
         <Select value={filterMonth} onValueChange={setFilterMonth}>
           <SelectTrigger className="w-36"><SelectValue placeholder="Semua Bulan" /></SelectTrigger>
           <SelectContent>
-            <SelectItem value="">Semua Bulan</SelectItem>
+            <SelectItem value="__ALL__">Semua Bulan</SelectItem>
             {MONTH_NAMES.map((m, i) => <SelectItem key={i+1} value={String(i+1)}>{m}</SelectItem>)}
           </SelectContent>
         </Select>
         <Select value={filterYear} onValueChange={setFilterYear}>
           <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
           <SelectContent>
-            {[2024, 2025, 2026, 2027].map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
+            {Array.from({length: 5}, (_, i) => new Date().getFullYear() - i).map((y) => <SelectItem key={y} value={String(y)}>{y}</SelectItem>)}
           </SelectContent>
         </Select>
       </div>
+
+      {categoryList.length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+          {categoryList.map(([cat, total]) => (
+            <Card key={cat}>
+              <CardContent className="p-4">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <p className="text-xs text-white/50 truncate max-w-[100px]">{cat}</p>
+                    <p className="text-lg font-bold text-white mt-1">{formatCurrency(total, "IDR")}</p>
+                    {totalIDR > 0 && (
+                      <p className="text-xs text-white/40 mt-0.5">
+                        {((total / totalIDR) * 100).toFixed(1)}%
+                      </p>
+                    )}
+                  </div>
+                  <div className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 ${getCategoryColor(cat)}`}>
+                    {getCategoryIcon(cat)}
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       <Card>
         <CardHeader className="pb-2 flex-row items-center justify-between">
@@ -293,6 +399,39 @@ function ExpensesContent() {
           )}
         </CardContent>
       </Card>
+
+      <Dialog open={catOpen} onOpenChange={setCatOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Kelola Kategori</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 mt-2">
+            <form onSubmit={handleAddCategory} className="flex gap-2">
+              <Input
+                value={newCategory}
+                onChange={(e) => setNewCategory(e.target.value)}
+                placeholder="Tambah kategori baru..."
+                maxLength={100}
+              />
+              <Button type="submit" size="sm"><Plus className="h-4 w-4" /></Button>
+            </form>
+            <div className="space-y-1 max-h-60 overflow-y-auto">
+              {categories.map((cat) => (
+                <div key={cat} className="flex items-center justify-between px-3 py-2 rounded-lg bg-white/5">
+                  <span className="text-sm text-white">{cat}</span>
+                  <Button variant="ghost" size="icon" className="h-6 w-6 hover:text-red-400" onClick={() => handleDeleteCategory(cat)}>
+                    <Trash2 className="h-3 w-3" />
+                  </Button>
+                </div>
+              ))}
+              {categories.length === 0 && (
+                <p className="text-center text-white/30 text-sm py-4">Belum ada kategori</p>
+              )}
+            </div>
+            <Button variant="outline" className="w-full" onClick={() => setCatOpen(false)}>Tutup</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

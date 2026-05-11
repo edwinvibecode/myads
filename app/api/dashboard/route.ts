@@ -28,7 +28,7 @@ export async function GET(req: Request) {
     currency === "USD" ? amount * rate : amount;
 
   const revenueWhere: Record<string, unknown> = { userId, month, year };
-  if (domainId && domainId !== "global") revenueWhere.domainId = parseInt(domainId, 10);
+  if (domainId && domainId !== "__ALL__" && domainId !== "global") revenueWhere.domainId = parseInt(domainId, 10);
 
   const monthStart = new Date(`${year}-${String(month).padStart(2, "0")}-01`);
   const monthEnd = new Date(monthStart);
@@ -38,7 +38,7 @@ export async function GET(req: Request) {
     userId,
     date: { gte: monthStart, lt: monthEnd },
   };
-  if (domainId === "global") {
+  if (domainId === "__ALL__" || domainId === "global") {
     expenseWhere.domainId = null;
   } else if (domainId) {
     expenseWhere.domainId = parseInt(domainId, 10);
@@ -83,7 +83,7 @@ export async function GET(req: Request) {
   );
 
   const trendWhere: Record<string, unknown> = { userId };
-  if (domainId && domainId !== "global") trendWhere.domainId = parseInt(domainId, 10);
+  if (domainId && domainId !== "__ALL__" && domainId !== "global") trendWhere.domainId = parseInt(domainId, 10);
 
   const trendRevenues = await prisma.revenueEntry.findMany({
     where: { ...trendWhere, year: { gte: year - 1 } },

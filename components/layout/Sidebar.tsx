@@ -9,6 +9,8 @@ import {
   Settings,
   Globe,
   LogOut,
+  Code2,
+  User,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils";
@@ -17,7 +19,9 @@ const navItems = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
   { href: "/revenue", label: "Revenue", icon: DollarSign },
   { href: "/expenses", label: "Pengeluaran", icon: CreditCard },
+  { href: "/ad-codes", label: "Kode Iklan", icon: Code2 },
   { href: "/reports", label: "Laporan", icon: BarChart3 },
+  { href: "/settings/profile", label: "Profile", icon: User },
   { href: "/settings/domains", label: "Settings", icon: Settings },
 ];
 

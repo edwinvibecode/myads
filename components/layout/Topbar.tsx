@@ -1,5 +1,5 @@
 "use client";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { ChevronDown, Globe } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { MONTH_NAMES } from "@/lib/utils";
@@ -19,6 +19,7 @@ interface TopbarProps {
 
 export function Topbar({ domains, currentDomainId, month, year }: TopbarProps) {
   const router = useRouter();
+  const pathname = usePathname();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -34,7 +35,7 @@ export function Topbar({ domains, currentDomainId, month, year }: TopbarProps) {
 
   const navigate = (params: Record<string, string>) => {
     const sp = new URLSearchParams({ month: String(month), year: String(year), ...params });
-    router.push(`/?${sp.toString()}`);
+    router.push(`${pathname}?${sp.toString()}`);
   };
 
   return (
