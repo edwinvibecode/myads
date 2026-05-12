@@ -71,3 +71,6 @@ prisma/dev.db-journal
 *.zip
 *.tar.gz
 *.rar
+
+# Deployment notes
+DEPLOY.md
